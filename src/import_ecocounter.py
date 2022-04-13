@@ -45,6 +45,14 @@ INTERVAL_1_WEEK_STEP = "week"
 INTERVAL_1_MONTH_STEP = "month"
 INTERVAL_1_YEAR_STEP = "year"
 
+
+INTERVAL_15_MIN_LABEL = "15 Minuten"
+INTERVAL_1_HOUR_LABEL = "Stunde"
+INTERVAL_1_DAY_LABEL = "Tag"
+INTERVAL_1_WEEK_LABEL = "Woche"
+INTERVAL_1_MONTH_LABEL = "Monat"
+INTERVAL_1_YEAR_LABEL = "Jahr"
+
 INTERVAL_15_MIN_DURATION = datetime.timedelta(minutes=15)
 INTERVAL_1_HOUR_DURATION = datetime.timedelta(hours=1)
 INTERVAL_1_DAY_DURATION = datetime.timedelta(days=1)
@@ -107,9 +115,8 @@ sites =  [
     {'id': 101064714, 'name': 'Mariendorfer Damm', 'location': 'Mariendorfer Damm', 'direction': 'Norden', 'district': 'Tempelhof-Schöneberg'},
     {'id': 102064714, 'name': 'Mariendorfer Damm', 'location': 'Mariendorfer Damm', 'direction': 'Süden', 'district': 'Tempelhof-Schöneberg'},
     {'id': 353277807, 'name': 'Straße des 17. Juni', 'location': 'Straße des 17. Juni', 'direction': 'Charlottenburg', 'district': 'Charlottenburg-Wilmersdorf'},
+    {'id': 300021646, 'name': 'Karl-Marx-Allee', 'location': 'Karl-Marx-Allee', 'direction': 'Beide', 'district': 'Mitte'},
 ]
-
-
 
 observedProperty = None
 sensor = None
@@ -247,6 +254,7 @@ def create_thing(site):
             "properties" : {
                 "siteID": site['id'],
                 "siteName": site['name'],
+                "status": None,
                 "location": siteDetails['location'],
                 "district": siteDetails['district'],
                 "direction": siteDetails['direction'],
@@ -268,12 +276,12 @@ def create_thing(site):
             ],
             "Datastreams": []
         }
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_15_MIN_STEP, INTERVAL_15_MIN))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_HOUR_STEP, INTERVAL_1_HOUR))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_DAY_STEP, INTERVAL_1_DAY))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_WEEK_STEP, INTERVAL_1_WEEK))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_MONTH_STEP, INTERVAL_1_MONTH))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_YEAR_STEP, INTERVAL_1_YEAR))
+        thing['Datastreams'].append(create_datastream(site, INTERVAL_15_MIN_STEP, INTERVAL_15_MIN, INTERVAL_15_MIN_LABEL))
+        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_HOUR_STEP, INTERVAL_1_HOUR, INTERVAL_1_HOUR_LABEL))
+        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_DAY_STEP, INTERVAL_1_DAY, INTERVAL_1_DAY_LABEL))
+        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_WEEK_STEP, INTERVAL_1_WEEK, INTERVAL_1_WEEK_LABEL))
+        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_MONTH_STEP, INTERVAL_1_MONTH, INTERVAL_1_MONTH_LABEL))
+        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_YEAR_STEP, INTERVAL_1_YEAR, INTERVAL_1_YEAR_LABEL))
 
         # Store Thing in Frost-Server
         #print(json.dumps(thing, indent=4, sort_keys=True))
@@ -284,7 +292,7 @@ def create_thing(site):
         else:
             print("Created Thing "+thing['name'])
 
-def create_datastream(site, step, step_label):
+def create_datastream(site, step, step_name_part, step_label):
     return {
             "name": "Anzahl Fahrräder "+step_label,
             "description" : "Anzahl Fahrräder pro "+step_label+" für Site: "+str(site['id']),
@@ -292,13 +300,13 @@ def create_datastream(site, step, step_label):
             "Sensor": {"@iot.id": sensor},
             "unitOfMeasurement": {
                 "name": "Verkehrsstärke",
-                "symbol": "bikes/"+step
+                "symbol": "Fahrräder/"+step_label
             },
             "ObservedProperty": {"@iot.id": observedProperty},
             "properties": {
-                "layerName": "Anzahl_Fahrrad_Zaehlstelle_"+step_label,
+                "layerName": "Anzahl_Fahrrad_Zaehlstelle_"+step_name_part,
                 "step": step,
-                "periodLength": step_label
+                "periodLength": step_name_part
             }
         }
 
@@ -327,6 +335,9 @@ def update_thing(thing, site):
         if thing['properties']['photos'] != site['photos']:
             updatedThing['properties']['photos'] = site['photos']
             changed = True
+    elif ('photos' in thing['properties']) or ('photos' in site):
+        updatedThing['properties']['photos'] = site['photos']
+        changed = True
     if not siteDetails is None:
         if thing['properties']['location'] != siteDetails['location']:
             updatedThing['properties']['location'] = siteDetails['location']
@@ -370,6 +381,8 @@ def get_sites():
             })
             if not site['channels'] is None:
                 for channel in site['channels']:
+                    if channel['photos'] == None:
+                        channel['photos'] = site['photos']
                     result.append({
                         'id': channel['id'],
                         'site': site['id'],
@@ -399,6 +412,7 @@ def load_observations(datastream, starttime):
         while '@iot.nextLink' in json_response:
             r = requests.get(json_response['@iot.nextLink'])
             if r.status_code != 200:
+                print(r.text)
                 print(str(r.status_code)+": "+r.json()['message'])
                 raise Exception("Could not load Data from Frost")
             json_response = r.json()
@@ -417,13 +431,17 @@ def load_observations(datastream, starttime):
 
 def import_observations():
     start = TIMEZONE.localize(datetime.datetime.now() - datetime.timedelta(days=3))
+    #start = TIMEZONE.localize(datetime.datetime(2015, 1, 1))
 
     for thing in things:
         observations = []
         print('Site: '+str(thing['properties']['siteID']) + ' ('+thing['name']+')')
         for datastream in thing['Datastreams']:
             begin = startOfStep(start, datastream['properties']['step'])
-            params = {'begin': begin.strftime("%Y-%m-%dT%H:%M:%S%z"), 'step':datastream['properties']['step'], 'complete': 'false'}
+            siteDetails = get_siteDetails({'id': thing['properties']['siteID']})
+            if not siteDetails is None and 'importFrom' in siteDetails:
+                begin = startOfStep(TIMEZONE.localize(datetime.datetime.strptime(siteDetails['importFrom'], "%Y-%m-%d")), datastream['properties']['step'])
+            params = {'begin': (begin+datetime.timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%S%z"), 'step':datastream['properties']['step'], 'complete': 'false'}
             print(params)
             response = requests.get(API_DATA + str(thing['properties']['siteID']), params=params, auth=getToken())
             if (response.status_code == 401):
@@ -434,6 +452,10 @@ def import_observations():
                 existing_observations = load_observations(datastream, begin)
                 json_response = response.json()
                 print('Results: '+str(len(json_response)))
+                if(datastream['properties']['step'] == 'day'):
+                    status = 'active' if len(json_response) > 0 else 'inactive'
+                    if not 'status' in thing['properties'] or not thing['properties']['status'] == status:
+                        set_thing_status(thing, status)
                 for result in json_response:
                     observation = create_or_update_observation(result, datastream, existing_observations)
                     if not observation is None:
@@ -444,6 +466,19 @@ def import_observations():
                 post_observations(observations)
                 observations = []
         post_observations(observations)
+
+def set_thing_status(thing, status):
+    updatedThing = {'properties':thing['properties']}
+    updatedThing['properties']['status'] = status
+
+    # Update Thing-Status in Frost-Server
+    q_res = requests.patch(FROST_BASE_URL+'/Things('+str(thing['@iot.id'])+')', auth=frost_auth, json=updatedThing)
+    if (q_res.status_code != 200):
+        print(json.dumps(thing, indent=4, sort_keys=True))
+        print("Could not update Thing "+thing['name']+'('+str(thing['@iot.id'])+')')
+        print(q_res.text)
+    else:
+        print("Set Thing "+thing['name']+'('+str(thing['@iot.id'])+') to '+status)
 
 def post_observations(observations):
     print('Observations: '+str(len(observations)))
@@ -480,6 +515,7 @@ def create_or_update_observation(result, datastream, observations):
             observation = {
                 "@iot.id" : observation['@iot.id'],
                 "phenomenonTime": observation['phenomenonTime'],
+                "resultTime": datetime.datetime.now().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                 "result": observation['result']
             }
             update_obersvation(observation)
@@ -491,11 +527,13 @@ def create_or_update_observation(result, datastream, observations):
             },
             "components" : [
                 "phenomenonTime",
+                "resultTime",
                 "result"
             ],
             "dataArray" : [
                 [
                     phenomenonTime,
+                    datetime.datetime.now().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     result['counts']
                 ]
             ]
@@ -562,13 +600,16 @@ def load_things():
             results += json_response['value']
     return results
 
-@sched.scheduled_job('cron', hour=5)
+@sched.scheduled_job('cron', hour=5, minute=15)
+@sched.scheduled_job('cron', hour=9)
 def run_import():
     init_things()
     import_observations()
 
 init()
 
-print("Starting Scheduler")
-sched.start()
-print("End")
+run_import()
+
+#print("Starting Scheduler")
+#sched.start()
+#print("End")

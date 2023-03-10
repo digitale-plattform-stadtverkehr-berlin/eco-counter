@@ -64,7 +64,7 @@ UTC = pytz.utc
 sites =  [
     {'id': 100024661, 'name': 'Jannowitzbrücke', 'location': 'Jannowitzbrücke', 'direction': 'Beide', 'district': 'Mitte'},
     {'id': 100032152, 'name': 'Invalidenstraße', 'location': 'Invalidenstraße', 'direction': 'Beide', 'district': 'Mitte'},
-    {'id': 100053586, 'name': 'Oberbaumbrücke', 'location': 'Oberbaumbrücke', 'direction': 'Beide', 'district': 'Friedrichshain-Kreuzberg'},
+    {'id': 300023833, 'name': 'Oberbaumbrücke', 'location': 'Oberbaumbrücke', 'direction': 'Beide', 'district': 'Friedrichshain-Kreuzberg'},
     {'id': 100032154, 'name': 'Frankfurter Allee', 'location': 'Frankfurter Allee', 'direction': 'Beide', 'district': 'Friedrichshain-Kreuzberg'},
     {'id': 300019043, 'name': 'Straße des 17. Juni', 'location': 'Straße des 17. Juni', 'direction': 'Beide', 'district': 'Charlottenburg-Wilmersdorf'},
     {'id': 100032155, 'name': 'Berliner Straße', 'location': 'Berliner Straße', 'direction': 'Beide', 'district': 'Pankow'},
@@ -110,12 +110,14 @@ sites =  [
     {'id': 102033038, 'name': 'Yorckstraße', 'location': 'Yorckstraße', 'direction': 'Schöneberg', 'district': 'Tempelhof-Schöneberg'},
     {'id': 101033039, 'name': 'Prinzregentenstraße', 'location': 'Prinzregentenstraße', 'direction': 'Norden', 'district': 'Charlottenburg-Wilmersdorf'},
     {'id': 102033039, 'name': 'Prinzregentenstraße', 'location': 'Prinzregentenstraße', 'direction': 'Süden', 'district': 'Charlottenburg-Wilmersdorf'},
-    {'id': 101053586, 'name': 'Oberbaumbrücke', 'location': 'Oberbaumbrücke', 'direction': 'Friedrichshain', 'district': 'Friedrichshain-Kreuzberg'},
-    {'id': 102053586, 'name': 'Oberbaumbrücke', 'location': 'Oberbaumbrücke', 'direction': 'Kreuzberg', 'district': 'Friedrichshain-Kreuzberg'},
+    {'id': 353310274, 'name': 'Oberbaumbrücke', 'location': 'Oberbaumbrücke', 'direction': 'Friedrichshain', 'district': 'Friedrichshain-Kreuzberg'},
+    {'id': 353310273, 'name': 'Oberbaumbrücke', 'location': 'Oberbaumbrücke', 'direction': 'Kreuzberg', 'district': 'Friedrichshain-Kreuzberg'},
     {'id': 101064714, 'name': 'Mariendorfer Damm', 'location': 'Mariendorfer Damm', 'direction': 'Norden', 'district': 'Tempelhof-Schöneberg'},
     {'id': 102064714, 'name': 'Mariendorfer Damm', 'location': 'Mariendorfer Damm', 'direction': 'Süden', 'district': 'Tempelhof-Schöneberg'},
     {'id': 353277807, 'name': 'Straße des 17. Juni', 'location': 'Straße des 17. Juni', 'direction': 'Charlottenburg', 'district': 'Charlottenburg-Wilmersdorf'},
-    {'id': 300021646, 'name': 'Karl-Marx-Allee', 'location': 'Karl-Marx-Allee', 'direction': 'Beide', 'district': 'Mitte'},
+    {'id': 353277806, 'name': 'Straße des 17. Juni', 'location': 'Straße des 17. Juni', 'direction': 'Mitte', 'district': 'Charlottenburg-Wilmersdorf'},
+    {'id': 300021646, 'name': 'Karl-Marx-Allee', 'location': 'Karl-Marx-Allee', 'direction': 'Westen', 'district': 'Mitte'},
+    {'id': 300028062, 'name': 'Senefelderplatz', 'location': 'Senefelderplatz', 'direction': 'Norden', 'district': 'Pankow'},
 ]
 
 observedProperty = None
@@ -168,6 +170,10 @@ def load_observedProperty():
             for property in  json_response['value']:
                 if 'name' in property and property['name'] == 'Verkehrsstärke':
                     return property['@iot.id']
+    else:
+        print("Error "+str(response.status_code))
+        print(response.text)
+        raise Exception('Could not load ObservedProperty!')
     return None
 
 def create_observedProperty():
@@ -202,6 +208,10 @@ def load_sensor():
             for sensor in  json_response['value']:
                 if 'name' in sensor and sensor['name'] == 'EcoCounter':
                     return sensor['@iot.id']
+    else:
+        print("Error "+str(response.status_code))
+        print(response.text)
+        raise Exception('Could not load Sensor!')
     return None
 
 def create_sensor():
@@ -249,24 +259,23 @@ def create_thing(site):
     siteDetails = get_siteDetails(site)
     if not siteDetails is None:
         thing = {
-            "name" : site['name'],
-            "description" : "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+") - Richtung: "+siteDetails['direction'],
+            "name" : str(site['id']),
+            "description" : "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+")",
             "properties" : {
                 "siteID": site['id'],
                 "siteName": site['name'],
                 "status": None,
                 "location": siteDetails['location'],
                 "district": siteDetails['district'],
-                "direction": siteDetails['direction'],
                 "userType": site['userType'],
-                "installationDate": site['installationDate'],
+                "installationDate": datetime.datetime.strptime(site['installationDate'], "%Y-%m-%dT%H:%M:%S%z").strftime("%d.%m.%Y"),
                 "firstData": site['firstData'],
                 "photos": site['photos'],
             },
             "Locations": [
                 {
                     "name": siteDetails['location'],
-                    "description": siteDetails['location']+"("+siteDetails['district']+") - Richtung: "+siteDetails['direction'],
+                    "description": siteDetails['location']+"("+siteDetails['district']+")",
                     "encodingType": "application/geo+json",
                     "location": {
                         "type": "Point",
@@ -276,15 +285,13 @@ def create_thing(site):
             ],
             "Datastreams": []
         }
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_15_MIN_STEP, INTERVAL_15_MIN, INTERVAL_15_MIN_LABEL))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_HOUR_STEP, INTERVAL_1_HOUR, INTERVAL_1_HOUR_LABEL))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_DAY_STEP, INTERVAL_1_DAY, INTERVAL_1_DAY_LABEL))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_WEEK_STEP, INTERVAL_1_WEEK, INTERVAL_1_WEEK_LABEL))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_MONTH_STEP, INTERVAL_1_MONTH, INTERVAL_1_MONTH_LABEL))
-        thing['Datastreams'].append(create_datastream(site, INTERVAL_1_YEAR_STEP, INTERVAL_1_YEAR, INTERVAL_1_YEAR_LABEL))
+        create_datastreams(thing, site);
+        if 'channels' in site and site['channels'] is not None:
+            for channel in site['channels']:
+                create_datastreams(thing, channel);
 
         # Store Thing in Frost-Server
-        #print(json.dumps(thing, indent=4, sort_keys=True))
+        print(json.dumps(thing, indent=4, sort_keys=True))
         q_res = requests.post(FROST_BASE_URL+'/Things', auth=frost_auth, json=thing)
         if (q_res.status_code != 201):
             print("Could not create Thing "+thing['name'])
@@ -292,10 +299,23 @@ def create_thing(site):
         else:
             print("Created Thing "+thing['name'])
 
+def create_datastreams(thing, site):
+    siteDetails = get_siteDetails(site)
+    if siteDetails is None:
+        print("Could not find Details for Site: "+str(site['id']))
+        return None
+    thing['Datastreams'].append(create_datastream(site, INTERVAL_15_MIN_STEP, INTERVAL_15_MIN, INTERVAL_15_MIN_LABEL))
+    thing['Datastreams'].append(create_datastream(site, INTERVAL_1_HOUR_STEP, INTERVAL_1_HOUR, INTERVAL_1_HOUR_LABEL))
+    thing['Datastreams'].append(create_datastream(site, INTERVAL_1_DAY_STEP, INTERVAL_1_DAY, INTERVAL_1_DAY_LABEL))
+    thing['Datastreams'].append(create_datastream(site, INTERVAL_1_WEEK_STEP, INTERVAL_1_WEEK, INTERVAL_1_WEEK_LABEL))
+    thing['Datastreams'].append(create_datastream(site, INTERVAL_1_MONTH_STEP, INTERVAL_1_MONTH, INTERVAL_1_MONTH_LABEL))
+    thing['Datastreams'].append(create_datastream(site, INTERVAL_1_YEAR_STEP, INTERVAL_1_YEAR, INTERVAL_1_YEAR_LABEL))
+
 def create_datastream(site, step, step_name_part, step_label):
+    siteDetails = get_siteDetails(site)
     return {
-            "name": "Anzahl Fahrräder "+step_label,
-            "description" : "Anzahl Fahrräder pro "+step_label+" für Site: "+str(site['id']),
+            "name": "Anzahl Fahrräder "+step_label + " - Richtung: "+siteDetails['direction'],
+            "description" : "Anzahl Fahrräder pro "+step_label+" für Site: "+str(site['id']) + " - Richtung: "+siteDetails['direction'],
             "observationType": "http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement",
             "Sensor": {"@iot.id": sensor},
             "unitOfMeasurement": {
@@ -304,9 +324,12 @@ def create_datastream(site, step, step_name_part, step_label):
             },
             "ObservedProperty": {"@iot.id": observedProperty},
             "properties": {
+                "siteID": site['id'],
                 "layerName": "Anzahl_Fahrrad_Zaehlstelle_"+step_name_part,
                 "step": step,
-                "periodLength": step_name_part
+                "periodLength": step_name_part,
+                "periodLengthLabel": step_label,
+                "direction": siteDetails["direction"]
             }
         }
 
@@ -317,16 +340,16 @@ def update_thing(thing, site):
     if thing['properties']['siteID'] != site['id']:
         updatedThing['properties']['siteID'] = site['id']
         changed = True
-    if thing['name'] !=  site['name']:
-        updatedThing['name'] =  site['name']
-        updatedThing['description'] = "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+") - Richtung: "+siteDetails['direction'],
+    if thing['name'] != str(site['id']):
+        updatedThing['name'] =  str(site['id'])
+        updatedThing['description'] = "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+")"
         updatedThing['properties']['siteName'] = site['name']
         changed = True
     if thing['properties']['userType'] != site['userType']:
         updatedThing['properties']['userType'] = site['userType']
         changed = True
-    if thing['properties']['installationDate'] != site['installationDate']:
-        updatedThing['properties']['installationDate'] = site['installationDate']
+    if thing['properties']['installationDate'] != datetime.datetime.strptime(site['installationDate'], "%Y-%m-%dT%H:%M:%S%z").strftime("%d.%m.%Y"):
+        updatedThing['properties']['installationDate'] = datetime.datetime.strptime(site['installationDate'], "%Y-%m-%dT%H:%M:%S%z").strftime("%d.%m.%Y");
         changed = True
     if thing['properties']['firstData'] != site['firstData']:
         updatedThing['properties']['firstData'] = site['firstData']
@@ -341,63 +364,103 @@ def update_thing(thing, site):
     if not siteDetails is None:
         if thing['properties']['location'] != siteDetails['location']:
             updatedThing['properties']['location'] = siteDetails['location']
-            updatedThing['description'] = "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+") - Richtung: "+siteDetails['direction'],
+            updatedThing['description'] = "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+")"
             changed = True
         if thing['properties']['district'] != siteDetails['district']:
             updatedThing['properties']['district'] = siteDetails['district']
-            updatedThing['description'] = "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+") - Richtung: "+siteDetails['direction'],
-            changed = True
-        if thing['properties']['direction'] != siteDetails['direction']:
-            updatedThing['properties']['direction'] = siteDetails['direction']
-            updatedThing['description'] = "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+") - Richtung: "+siteDetails['direction'],
+            updatedThing['description'] = "Fahrradzählstelle "+siteDetails['location']+" ("+siteDetails['district']+")"
             changed = True
 
     if changed:
         # Update Thing in Frost-Server
         q_res = requests.patch(FROST_BASE_URL+'/Things('+str(thing['@iot.id'])+')', auth=frost_auth, json=updatedThing)
         if (q_res.status_code != 200):
-            print(json.dumps(thing, indent=4, sort_keys=True))
+            print(json.dumps(updatedThing, indent=4, sort_keys=True))
             print("Could not update Thing "+thing['name']+'('+str(thing['@iot.id'])+')')
             print(q_res.text)
         else:
             print("Updated Thing "+thing['name']+'('+str(thing['@iot.id'])+')')
 
+    updateDatastreams(thing, site)
+
+def updateDatastreams(thing, site):
+    siteIDs = []
+    for datastream in thing["Datastreams"]:
+        datastreamSite = findSite(datastream["properties"]["siteID"], site)
+        siteIDs.append(datastream["properties"]["siteID"])
+        if not datastreamSite is None:
+            updatedDatastream = {'properties':datastream['properties']}
+            siteDetails = get_siteDetails(datastreamSite)
+            changed = False
+
+
+            if datastream["name"] != "Anzahl Fahrräder "+datastream["properties"]["periodLengthLabel"] + " - Richtung: "+siteDetails['direction']:
+                updatedDatastream["name"] = "Anzahl Fahrräder "+datastream["properties"]["periodLengthLabel"] + " - Richtung: "+siteDetails['direction']
+                changed = True
+            if datastream["description"] != "Anzahl Fahrräder pro "+datastream["properties"]["periodLengthLabel"]+" für Site: "+str(datastreamSite['id']) + " - Richtung: "+siteDetails['direction']:
+                updatedDatastream["description"] = "Anzahl Fahrräder pro "+datastream["properties"]["periodLengthLabel"]+" für Site: "+str(datastreamSite['id']) + " - Richtung: "+siteDetails['direction']
+                changed = True
+            if datastream["properties"]["direction"] != siteDetails["direction"]:
+                updatedDatastream["properties"]["direction"] = siteDetails["direction"]
+                changed = True
+
+            if changed:
+            # Update Datastream in Frost-Server
+                q_res = requests.patch(FROST_BASE_URL+'/Datastreams('+str(datastream['@iot.id'])+')', auth=frost_auth, json=updatedDatastream)
+                if (q_res.status_code != 200):
+                    print(json.dumps(updatedDatastream, indent=4, sort_keys=True))
+                    print("Could not update Datastream "+datastream['name']+'('+str(datastream['@iot.id'])+')')
+                    print(q_res.text)
+                else:
+                    print("Updated Datastream "+updatedDatastream['name']+'('+str(datastream['@iot.id'])+')')
+
+    newDatastreams = []
+    if 'channels' in site and site['channels'] is not None:
+        for channel in site['channels']:
+            if not channel['id'] in siteIDs:
+                siteDetails = get_siteDetails(channel)
+                if not siteDetails is None:
+                    newDatastreams.append(create_datastream(channel, INTERVAL_15_MIN_STEP, INTERVAL_15_MIN, INTERVAL_15_MIN_LABEL))
+                    newDatastreams.append(create_datastream(channel, INTERVAL_1_HOUR_STEP, INTERVAL_1_HOUR, INTERVAL_1_HOUR_LABEL))
+                    newDatastreams.append(create_datastream(channel, INTERVAL_1_DAY_STEP, INTERVAL_1_DAY, INTERVAL_1_DAY_LABEL))
+                    newDatastreams.append(create_datastream(channel, INTERVAL_1_WEEK_STEP, INTERVAL_1_WEEK, INTERVAL_1_WEEK_LABEL))
+                    newDatastreams.append(create_datastream(channel, INTERVAL_1_MONTH_STEP, INTERVAL_1_MONTH, INTERVAL_1_MONTH_LABEL))
+                    newDatastreams.append(create_datastream(channel, INTERVAL_1_YEAR_STEP, INTERVAL_1_YEAR, INTERVAL_1_YEAR_LABEL))
+
+    for datastream in newDatastreams:
+        r = requests.post(url=FROST_BASE_URL+"/Things("+str(thing['@iot.id'])+")/Datastreams", auth=frost_auth, json=datastream)
+        if (r.status_code == 201):
+            print("Datastream created for Thing "+str(thing['@iot.id'])+": " + datastream["name"])
+            r = requests.get(r.headers["location"])
+            if (r.status_code == 200):
+                datastream['@iot.id'] = r.json()['@iot.id']
+        else:
+            print("Could not create Datastream for Thing "+str(thing['@iot.id'])+": " + datastream["name"])
+            print(str(r.status_code)+": "+r.json()['message'])
+
+
+
+
+def findSite(siteID, site):
+    if site['id'] == siteID:
+        return site
+    if 'channels' in site and site['channels'] is not None:
+        for channel in site['channels']:
+            if channel['id'] == siteID:
+                return channel
+    return None
+
+
 def get_sites():
-    result = []
+    json_response = []
 
     response = requests.get(API_SITES, auth=getToken())
     if (response.status_code == 200):
         json_response = response.json()
-        for site in json_response:
-            result.append({
-                'id': site['id'],
-                'name': site['name'],
-                'latitude': site['latitude'],
-                'longitude': site['longitude'],
-                'userType': site['userType'],
-                'installationDate': site['installationDate'],
-                'firstData': site['firstData'],
-                'photos': site['photos'],
-            })
-            if not site['channels'] is None:
-                for channel in site['channels']:
-                    if channel['photos'] == None:
-                        channel['photos'] = site['photos']
-                    result.append({
-                        'id': channel['id'],
-                        'site': site['id'],
-                        'name': channel['name'],
-                        'latitude': channel['latitude'],
-                        'longitude': channel['longitude'],
-                        'userType': channel['userType'],
-                        'installationDate': channel['installationDate'],
-                        'firstData': channel['firstData'],
-                        'photos': channel['photos'],
-                    })
     else:
         print("Error "+str(response.status_code))
 
-    return result
+    return json_response
 
 def load_observations(datastream, starttime):
     url = FROST_OBSERVATIONS.replace('<DATASTREAM_ID>', str(datastream['@iot.id'])).replace('<STARTTIME>', starttime.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
@@ -430,24 +493,24 @@ def load_observations(datastream, starttime):
     return observations
 
 def import_observations():
-    start = TIMEZONE.localize(datetime.datetime.now() - datetime.timedelta(days=3))
+    start = TIMEZONE.localize(datetime.datetime.now() - datetime.timedelta(days=7))
     #start = TIMEZONE.localize(datetime.datetime(2015, 1, 1))
 
     for thing in things:
         observations = []
-        print('Site: '+str(thing['properties']['siteID']) + ' ('+thing['name']+')')
         for datastream in thing['Datastreams']:
+            print('Site: '+str(datastream['properties']['siteID']) + ' ('+thing['properties']['location'] + ' - Richtung: ' +datastream['properties']['direction'] + ')')
             begin = startOfStep(start, datastream['properties']['step'])
-            siteDetails = get_siteDetails({'id': thing['properties']['siteID']})
-            if not siteDetails is None and 'importFrom' in siteDetails:
+            siteDetails = get_siteDetails({'id': datastream['properties']['siteID']})
+            if not siteDetails is None and 'importFrom' in siteDetails: # and not datastream['properties']['step'] == INTERVAL_15_MIN_STEP and not datastream['properties']['step'] == INTERVAL_1_HOUR_STEP:
                 begin = startOfStep(TIMEZONE.localize(datetime.datetime.strptime(siteDetails['importFrom'], "%Y-%m-%d")), datastream['properties']['step'])
-            params = {'begin': (begin+datetime.timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%S%z"), 'step':datastream['properties']['step'], 'complete': 'false'}
+            params = {'begin': (begin+datetime.timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%S"), 'step':datastream['properties']['step'], 'complete': 'false'}
             print(params)
-            response = requests.get(API_DATA + str(thing['properties']['siteID']), params=params, auth=getToken())
+            response = requests.get(API_DATA + str(datastream['properties']['siteID']), params=params, auth=getToken())
             if (response.status_code == 401):
                 global bearerToken
                 bearerToken['token'] = None
-                response = requests.get(API_DATA + str(thing['properties']['siteID']), params=params, auth=getToken())
+                response = requests.get(API_DATA + str(datastream['properties']['siteID']), params=params, auth=getToken())
             if (response.status_code == 200):
                 existing_observations = load_observations(datastream, begin)
                 json_response = response.json()
@@ -506,9 +569,11 @@ def update_obersvation(observation):
 
 def create_or_update_observation(result, datastream, observations):
     isoDateStart = datetime.datetime.strptime(result['isoDate'], '%Y-%m-%dT%H:%M:%S%z')
+    isoDateStart = TIMEZONE.localize(isoDateStart.replace(tzinfo=None))
     isoDateEnd = getEndTime(isoDateStart, datastream['properties']['step'])
     phenomenonTime = isoDateStart.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")+'/'+isoDateEnd.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     if phenomenonTime in observations:
+        #print('Found existing Observation: '+phenomenonTime)
         observation = observations[phenomenonTime]
         if not observation['result'] == result['counts']:
             observation['result'] = result['counts']
@@ -598,18 +663,22 @@ def load_things():
                 raise Exception("Could not load Data from Frost")
             json_response = r.json()
             results += json_response['value']
+    else:
+        print("Error "+str(response.status_code))
+        print(response.text)
+        raise Exception('Could not load Data from Frost!')
     return results
 
-@sched.scheduled_job('cron', hour=5, minute=15)
-@sched.scheduled_job('cron', hour=9)
+@sched.scheduled_job('cron', hour=5, minute=45)
+@sched.scheduled_job('cron', hour=9, minute=30)
 def run_import():
     init_things()
     import_observations()
 
 init()
 
-run_import()
+#run_import()
 
-#print("Starting Scheduler")
-#sched.start()
-#print("End")
+print("Starting Scheduler")
+sched.start()
+print("End")

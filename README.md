@@ -1,6 +1,8 @@
 # Import 
 
-Importer zum Übertragen von Messdaten aus der EcoVision API in einen Frost-Server 
+Importer zum Übertragen von Messdaten aus der EcoVision API in einen [FROST-Server](https://fraunhoferiosb.github.io/FROST-Server/).
+
+Die Struktur des FROST-Servers eignet sich zur Darstellung im [Masterportal](https://bitbucket.org/geowerkstatt-hamburg/masterportal/src/dev/) mit dem GFI-Theme [SensorChart](https://github.com/digitale-plattform-stadtverkehr-berlin/masterportal-addon-sensor-chart)
 
 ## Parameter
 

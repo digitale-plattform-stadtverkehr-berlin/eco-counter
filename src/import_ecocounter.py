@@ -4,6 +4,7 @@ import datetime
 import pytz
 import math
 import os
+import time
 from bearer_auth import BearerAuth
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -118,6 +119,12 @@ sites =  [
     {'id': 353277806, 'name': 'Straße des 17. Juni', 'location': 'Straße des 17. Juni', 'direction': 'Mitte', 'district': 'Charlottenburg-Wilmersdorf'},
     {'id': 300021646, 'name': 'Karl-Marx-Allee', 'location': 'Karl-Marx-Allee', 'direction': 'Westen', 'district': 'Mitte'},
     {'id': 300028062, 'name': 'Senefelderplatz', 'location': 'Senefelderplatz', 'direction': 'Norden', 'district': 'Pankow'},
+    {'id': 300037797, 'name': 'Nordufer', 'location': 'Nordufer', 'direction': 'Beide', 'district': 'Mitte'},
+    {'id': 353412943, 'name': 'Nordufer', 'location': 'Nordufer', 'direction': 'Osten', 'district': 'Mitte'},
+    {'id': 353412944, 'name': 'Nordufer', 'location': 'Nordufer', 'direction': 'Westen', 'district': 'Mitte'},
+    {'id': 300037798, 'name': 'Nonnendammallee', 'location': 'Nonnendammallee', 'direction': 'Beide', 'district': 'Spandau'},
+    {'id': 353412946, 'name': 'Nonnendammallee', 'location': 'Nonnendammallee', 'direction': 'Osten', 'district': 'Spandau'},
+    {'id': 353412947, 'name': 'Nonnendammallee', 'location': 'Nonnendammallee', 'direction': 'Westen', 'district': 'Spandau'},
 ]
 
 observedProperty = None
@@ -475,13 +482,16 @@ def load_observations(datastream, starttime):
         while '@iot.nextLink' in json_response:
             r = requests.get(json_response['@iot.nextLink'])
             if r.status_code != 200:
+                print(json_response['@iot.nextLink'])
                 print(r.text)
                 print(str(r.status_code)+": "+r.json()['message'])
                 raise Exception("Could not load Data from Frost")
             json_response = r.json()
             results += json_response['value']
     else:
-        print('Could not load Observations - '+str(r.status_code))
+        print(url)
+        print(r.text)
+        raise Exception("Could not load Data from Frost")
     observations = {}
     for result in results:
         phenomenonTime = result['phenomenonTime']
@@ -493,42 +503,57 @@ def load_observations(datastream, starttime):
     return observations
 
 def import_observations():
-    start = TIMEZONE.localize(datetime.datetime.now() - datetime.timedelta(days=7))
-    #start = TIMEZONE.localize(datetime.datetime(2015, 1, 1))
 
     for thing in things:
-        observations = []
         for datastream in thing['Datastreams']:
-            print('Site: '+str(datastream['properties']['siteID']) + ' ('+thing['properties']['location'] + ' - Richtung: ' +datastream['properties']['direction'] + ')')
-            begin = startOfStep(start, datastream['properties']['step'])
-            siteDetails = get_siteDetails({'id': datastream['properties']['siteID']})
-            if not siteDetails is None and 'importFrom' in siteDetails: # and not datastream['properties']['step'] == INTERVAL_15_MIN_STEP and not datastream['properties']['step'] == INTERVAL_1_HOUR_STEP:
-                begin = startOfStep(TIMEZONE.localize(datetime.datetime.strptime(siteDetails['importFrom'], "%Y-%m-%d")), datastream['properties']['step'])
-            params = {'begin': (begin+datetime.timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%S"), 'step':datastream['properties']['step'], 'complete': 'false'}
-            print(params)
-            response = requests.get(API_DATA + str(datastream['properties']['siteID']), params=params, auth=getToken())
-            if (response.status_code == 401):
-                global bearerToken
-                bearerToken['token'] = None
-                response = requests.get(API_DATA + str(datastream['properties']['siteID']), params=params, auth=getToken())
-            if (response.status_code == 200):
-                existing_observations = load_observations(datastream, begin)
-                json_response = response.json()
-                print('Results: '+str(len(json_response)))
-                if(datastream['properties']['step'] == 'day'):
-                    status = 'active' if len(json_response) > 0 else 'inactive'
-                    if not 'status' in thing['properties'] or not thing['properties']['status'] == status:
-                        set_thing_status(thing, status)
-                for result in json_response:
-                    observation = create_or_update_observation(result, datastream, existing_observations)
-                    if not observation is None:
-                        observations.append(observation)
-            else:
-                print(response.status_code)
-            if len(observations) >= 1000:
-                post_observations(observations)
-                observations = []
+            try:
+                importForDatastream(thing, datastream)
+            except:
+                print("Retry after 5 seconds!")
+                time.sleep(5)
+                try:
+                    importForDatastream(thing, datastream)
+                except Exception as e:
+                    print("Import failed!")
+                    print(e)
+
+
+def importForDatastream(thing, datastream):
+    start = TIMEZONE.localize(datetime.datetime.now() - datetime.timedelta(days=7))
+    # start = TIMEZONE.localize(datetime.datetime(2015, 1, 1))
+    observations = []
+    print(
+        'Site: ' + str(datastream['properties']['siteID']) + ' (' + thing['properties']['location'] + ' - Richtung: ' +
+        datastream['properties']['direction'] + ')')
+    begin = startOfStep(start, datastream['properties']['step'])
+    siteDetails = get_siteDetails({'id': datastream['properties']['siteID']})
+    if not siteDetails is None and 'importFrom' in siteDetails: # and not datastream['properties']['step'] == INTERVAL_15_MIN_STEP and not datastream['properties']['step'] == INTERVAL_1_HOUR_STEP:
+        begin = startOfStep(TIMEZONE.localize(datetime.datetime.strptime(siteDetails['importFrom'], "%Y-%m-%d")), datastream['properties']['step'])
+    params = {'begin': (begin).strftime("%Y-%m-%dT%H:%M:%S"), 'step': datastream['properties']['step'], 'complete': 'false'}
+    print(params)
+    response = requests.get(API_DATA + str(datastream['properties']['siteID']), params=params, auth=getToken())
+    if (response.status_code == 401):
+        global bearerToken
+        bearerToken['token'] = None
+        response = requests.get(API_DATA + str(datastream['properties']['siteID']), params=params, auth=getToken())
+    if (response.status_code == 200):
+        existing_observations = load_observations(datastream, begin)
+        json_response = response.json()
+        print('Results: ' + str(len(json_response)))
+        if (datastream['properties']['step'] == 'day'):
+            status = 'active' if len(json_response) > 0 else 'inactive'
+            if not 'status' in thing['properties'] or not thing['properties']['status'] == status:
+                set_thing_status(thing, status)
+        for result in json_response:
+            observation = create_or_update_observation(result, datastream, existing_observations)
+            if not observation is None:
+                observations.append(observation)
+    else:
+        print(response.status_code)
+    if len(observations) > 0:
         post_observations(observations)
+        observations = []
+
 
 def set_thing_status(thing, status):
     updatedThing = {'properties':thing['properties']}

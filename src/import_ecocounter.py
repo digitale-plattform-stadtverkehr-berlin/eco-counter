@@ -125,6 +125,8 @@ sites =  [
     {'id': 300037798, 'name': 'Nonnendammallee', 'location': 'Nonnendammallee', 'direction': 'Beide', 'district': 'Spandau'},
     {'id': 353412946, 'name': 'Nonnendammallee', 'location': 'Nonnendammallee', 'direction': 'Osten', 'district': 'Spandau'},
     {'id': 353412947, 'name': 'Nonnendammallee', 'location': 'Nonnendammallee', 'direction': 'Westen', 'district': 'Spandau'},
+    {'id': 300041564, 'name': 'Strausberger Platz', 'location': 'Strausberger Platz', 'direction': 'Osten', 'district': 'Mitte'},
+    {'id': 300041566, 'name': 'Schönhauser Allee', 'location': 'Schönhauser Allee', 'direction': 'Süden', 'district': 'Pankow'},
 ]
 
 observedProperty = None
@@ -493,13 +495,24 @@ def load_observations(datastream, starttime):
         print(r.text)
         raise Exception("Could not load Data from Frost")
     observations = {}
+    duplicates = []
     for result in results:
         phenomenonTime = result['phenomenonTime']
         phenomenonTimeSplit = phenomenonTime.split('/')
-        phenomenonTimeStart = UTC.localize(datetime.datetime.strptime(phenomenonTimeSplit[0], "%Y-%m-%dT%H:%M:%S.%fZ"))
-        phenomenonTimeEnd = UTC.localize(datetime.datetime.strptime(phenomenonTimeSplit[1], "%Y-%m-%dT%H:%M:%S.%fZ"))
-        phenomenonTime = phenomenonTimeStart.strftime("%Y-%m-%dT%H:%M:%S.%fZ")+'/'+phenomenonTimeEnd.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        observations[phenomenonTime] = result;
+        phenomenonTimeStart = UTC.localize(datetime.datetime.strptime(phenomenonTimeSplit[0], "%Y-%m-%dT%H:%M:%SZ"))
+        phenomenonTimeEnd = UTC.localize(datetime.datetime.strptime(phenomenonTimeSplit[1], "%Y-%m-%dT%H:%M:%SZ"))
+        phenomenonTime = phenomenonTimeStart.strftime("%Y-%m-%dT%H:%M:%SZ")+'/'+phenomenonTimeEnd.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if phenomenonTime in observations:
+            duplicates.append(result)
+        else:
+            observations[phenomenonTime] = result
+    for duplicate in duplicates:
+        print("Delete Duplicate Observation: "+str(duplicate["@iot.id"]))
+        r = requests.delete(FROST_BASE_URL+"/Observations("+str(duplicate["@iot.id"])+")", auth=frost_auth)
+        if (r.status_code != 200 and r.status_code != 201):
+            print("Could not delete Observations")
+            print(str(r.status_code)+": "+r.text)
+
     return observations
 
 def import_observations():
@@ -574,12 +587,12 @@ def post_observations(observations):
         firstObservations = observations[:1000]
         observations = observations[1000:]
         r = requests.post(url=POST_URL, auth=frost_auth, json=firstObservations, headers={"Content-Type": "application/json;charset=UTF-8"})
-        if (r.status_code != 201):
+        if (r.status_code != 200 and r.status_code != 201):
             print("Could not save Observations")
             print(str(r.status_code)+": "+r.text)
     if len(observations) > 0:
         r = requests.post(url=POST_URL, auth=frost_auth, json=observations, headers={"Content-Type": "application/json;charset=UTF-8"})
-        if (r.status_code != 201):
+        if (r.status_code != 200 and r.status_code != 201):
             print("Could not save Observations")
             print(str(r.status_code)+": "+r.text)
 
@@ -596,9 +609,9 @@ def create_or_update_observation(result, datastream, observations):
     isoDateStart = datetime.datetime.strptime(result['isoDate'], '%Y-%m-%dT%H:%M:%S%z')
     isoDateStart = TIMEZONE.localize(isoDateStart.replace(tzinfo=None))
     isoDateEnd = getEndTime(isoDateStart, datastream['properties']['step'])
-    phenomenonTime = isoDateStart.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")+'/'+isoDateEnd.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    phenomenonTime = isoDateStart.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")+'/'+isoDateEnd.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     if phenomenonTime in observations:
-        #print('Found existing Observation: '+phenomenonTime)
+        print('Found existing Observation: '+phenomenonTime)
         observation = observations[phenomenonTime]
         if not observation['result'] == result['counts']:
             observation['result'] = result['counts']
